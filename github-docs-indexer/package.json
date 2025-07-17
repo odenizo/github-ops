@@ -1,0 +1,43 @@
+{
+  "name": "github-docs-indexer",
+  "version": "1.0.0",
+  "description": "Generate directory index for GitHub/docs repository using repomix for LLM-optimized file lookup",
+  "main": "generate-github-docs-index.js",
+  "scripts": {
+    "start": "node generate-github-docs-index.js",
+    "generate": "node generate-github-docs-index.js",
+    "update": "node generate-github-docs-index.js",
+    "install-deps": "npm install repomix",
+    "test": "node -e \"console.log('Testing GitHub Docs Index Generator'); require('./generate-github-docs-index.js');\""
+  },
+  "dependencies": {
+    "repomix": "^0.2.25"
+  },
+  "keywords": [
+    "github",
+    "docs",
+    "documentation",
+    "directory",
+    "index",
+    "repomix",
+    "llm",
+    "ai",
+    "file-lookup",
+    "content-discovery"
+  ],
+  "author": "odenizo",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/odenizo/github-ops.git",
+    "directory": "github-docs-indexer"
+  },
+  "engines": {
+    "node": ">=14.0.0"
+  },
+  "files": [
+    "generate-github-docs-index.js",
+    "github-docs-directory-index.xml",
+    "README.md"
+  ]
+}
