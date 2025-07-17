@@ -1,0 +1,192 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- GitHub Docs Directory Index -->
+<!-- Generated for GitHub/docs repository content and data folders -->
+<!-- Optimized for LLM-based file lookup and content discovery -->
+<!-- Generated on: 2025-01-17T20:00:00.000Z -->
+
+<github_docs_index>
+  <metadata>
+    <repository>github/docs</repository>
+    <generated_date>2025-01-17T20:00:00.000Z</generated_date>
+    <target_directories>
+      <directory>content</directory>
+      <directory>data</directory>
+    </target_directories>
+    <purpose>LLM-optimized file lookup for GitHub documentation</purpose>
+  </metadata>
+  
+  <directory_structure>
+    <content>
+      <type>directory</type>
+      <description>Main documentation content in Markdown format</description>
+      <subdirectories>
+        <subdirectory>admin</subdirectory>
+        <subdirectory>apps</subdirectory>
+        <subdirectory>get-started</subdirectory>
+        <subdirectory>rest</subdirectory>
+        <subdirectory>graphql</subdirectory>
+        <subdirectory>webhooks</subdirectory>
+        <subdirectory>actions</subdirectory>
+        <subdirectory>packages</subdirectory>
+        <subdirectory>copilot</subdirectory>
+        <subdirectory>education</subdirectory>
+        <subdirectory>enterprise</subdirectory>
+        <subdirectory>organizations</subdirectory>
+        <subdirectory>repositories</subdirectory>
+        <subdirectory>pull-requests</subdirectory>
+        <subdirectory>issues</subdirectory>
+        <subdirectory>discussions</subdirectory>
+        <subdirectory>codespaces</subdirectory>
+        <subdirectory>authentication</subdirectory>
+        <subdirectory>billing</subdirectory>
+        <subdirectory>site-policy</subdirectory>
+      </subdirectories>
+      <file_patterns>
+        <pattern>*.md</pattern>
+      </file_patterns>
+      <examples>
+        <example>content/index.md</example>
+        <example>content/README.md</example>
+        <example>content/admin/guides.md</example>
+        <example>content/apps/overview.md</example>
+        <example>content/rest/git/tags.md</example>
+        <example>content/rest/quickstart.md</example>
+        <example>content/get-started/git-basics/git-cheatsheet.md</example>
+        <example>content/get-started/start-your-journey/hello-world.md</example>
+      </examples>
+    </content>
+    
+    <data>
+      <type>directory</type>
+      <description>Data files including reusables, variables, and configuration</description>
+      <subdirectories>
+        <subdirectory>reusables</subdirectory>
+        <subdirectory>variables</subdirectory>
+        <subdirectory>features</subdirectory>
+        <subdirectory>glossaries</subdirectory>
+        <subdirectory>learning-tracks</subdirectory>
+        <subdirectory>product-examples</subdirectory>
+        <subdirectory>ui</subdirectory>
+      </subdirectories>
+      <file_patterns>
+        <pattern>*.yml</pattern>
+        <pattern>*.yaml</pattern>
+        <pattern>*.json</pattern>
+        <pattern>*.js</pattern>
+        <pattern>*.md</pattern>
+      </file_patterns>
+      <examples>
+        <example>data/README.md</example>
+        <example>data/allowed-topics.js</example>
+        <example>data/reusables/git/git-push.md</example>
+        <example>data/reusables/gpg/x-509-key.md</example>
+        <example>data/reusables/ssh/about-ssh.md</example>
+        <example>data/reusables/cli/about-cli.md</example>
+        <example>data/reusables/docs/ghec-docs.md</example>
+        <example>data/reusables/saml/ghec-only.md</example>
+      </examples>
+    </data>
+  </directory_structure>
+  
+  <file_types>
+    <markdown>
+      <extension>.md</extension>
+      <locations>
+        <location>content/**/*.md</location>
+        <location>data/**/*.md</location>
+      </locations>
+      <description>Documentation content and reusable text snippets</description>
+    </markdown>
+    <yaml>
+      <extension>.yml, .yaml</extension>
+      <locations>
+        <location>data/**/*.yml</location>
+        <location>data/**/*.yaml</location>
+      </locations>
+      <description>Configuration and structured data files</description>
+    </yaml>
+    <json>
+      <extension>.json</extension>
+      <locations>
+        <location>data/**/*.json</location>
+      </locations>
+      <description>Structured data and configuration files</description>
+    </json>
+    <javascript>
+      <extension>.js</extension>
+      <locations>
+        <location>data/**/*.js</location>
+      </locations>
+      <description>Data processing and utility scripts</description>
+    </javascript>
+  </file_types>
+  
+  <query_patterns>
+    <find_content_by_topic>
+      <pattern>content/{topic}/**/*.md</pattern>
+      <description>Find documentation content by topic area</description>
+      <examples>
+        <example>content/actions/**/*.md</example>
+        <example>content/rest/**/*.md</example>
+      </examples>
+    </find_content_by_topic>
+    <find_reusables>
+      <pattern>data/reusables/{category}/*.md</pattern>
+      <description>Find reusable content snippets by category</description>
+      <examples>
+        <example>data/reusables/git/*.md</example>
+        <example>data/reusables/cli/*.md</example>
+      </examples>
+    </find_reusables>
+    <find_variables>
+      <pattern>data/variables/{scope}.yml</pattern>
+      <description>Find variable definitions by scope</description>
+      <examples>
+        <example>data/variables/product.yml</example>
+        <example>data/variables/ui.yml</example>
+      </examples>
+    </find_variables>
+  </query_patterns>
+  
+  <search_optimization>
+    <content_search>
+      <keywords>
+        <keyword>documentation</keyword>
+        <keyword>guide</keyword>
+        <keyword>tutorial</keyword>
+        <keyword>reference</keyword>
+        <keyword>api</keyword>
+      </keywords>
+      <locations>
+        <location>content/**/*.md</location>
+      </locations>
+      <weight>1.0</weight>
+    </content_search>
+    <reusable_search>
+      <keywords>
+        <keyword>reusable</keyword>
+        <keyword>snippet</keyword>
+        <keyword>template</keyword>
+        <keyword>include</keyword>
+      </keywords>
+      <locations>
+        <location>data/reusables/**/*.md</location>
+      </locations>
+      <weight>0.8</weight>
+    </reusable_search>
+    <configuration_search>
+      <keywords>
+        <keyword>config</keyword>
+        <keyword>settings</keyword>
+        <keyword>variables</keyword>
+        <keyword>data</keyword>
+      </keywords>
+      <locations>
+        <location>data/**/*.yml</location>
+        <location>data/**/*.yaml</location>
+        <location>data/**/*.json</location>
+      </locations>
+      <weight>0.6</weight>
+    </configuration_search>
+  </search_optimization>
+</github_docs_index>
