@@ -1,0 +1,49 @@
+# Example configuration for OCI Always Free deployment with Cloudflare Tunnel
+
+# Project configuration
+project_name = "my-code-server"
+environment  = "dev"
+
+# OCI Configuration
+oci_region            = "us-ashburn-1"
+# Set these via environment variables or terraform.tfvars.local:
+# oci_tenancy_ocid      = "ocid1.tenancy.oc1..xxx"
+# oci_compartment_ocid  = "ocid1.compartment.oc1..xxx"
+# oci_user_ocid        = "ocid1.user.oc1..xxx"
+# oci_fingerprint      = "xx:xx:xx:xx"
+# oci_private_key      = "-----BEGIN PRIVATE KEY-----\n..."
+
+# Instance Configuration (Always Free)
+use_always_free     = true
+enable_preemptible  = false
+boot_volume_size_gb = 50
+
+# Storage Configuration
+create_data_volume  = true
+data_volume_size_gb = 100
+enable_backups      = true
+
+# Code-Server Configuration
+codeserver_version = "4.20.0"
+codeserver_user    = "coder"
+
+# Network & Security
+ssh_allowed_cidr = "0.0.0.0/0"  # Restrict this to your IP for better security
+ssh_public_key   = ""           # Leave empty to auto-generate
+save_ssh_key     = true
+
+# Cloudflare Configuration (requires paid Cloudflare plan)
+enable_cloudflare_tunnel = true
+# Set these via environment variables or terraform.tfvars.local:
+# cloudflare_api_token   = "your_cloudflare_api_token"
+# cloudflare_account_id  = "your_cloudflare_account_id"
+cloudflare_domain        = "yourdomain.com"
+cloudflare_subdomain     = "ide"
+cloudflare_allowed_emails = [
+  "you@yourdomain.com",
+  "team@yourdomain.com"
+]
+cloudflare_session_duration = "24h"
+
+# HTTPS Configuration (ignored when Cloudflare tunnel is enabled)
+enable_https = false
