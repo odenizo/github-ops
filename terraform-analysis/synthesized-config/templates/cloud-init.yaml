@@ -1,0 +1,299 @@
+#cloud-config
+# Cloud-init configuration for Code-Server deployment
+# Synthesized from multiple repository analysis
+
+# Basic system configuration
+hostname: ${project_name}-${environment}
+fqdn: ${project_name}-${environment}.local
+
+# Package management
+package_update: true
+package_upgrade: true
+
+packages:
+  - curl
+  - wget
+  - git
+  - htop
+  - unzip
+  - jq
+  - build-essential
+  - python3-pip
+  - nodejs
+  - npm
+  - docker.io
+  - nginx
+  - certbot
+  - python3-certbot-nginx
+
+# User configuration
+users:
+  - name: ${codeserver_user}
+    groups: sudo, docker
+    shell: /bin/bash
+    sudo: ['ALL=(ALL) NOPASSWD:ALL']
+    home: /home/${codeserver_user}
+
+# File system configuration
+%{ if data_volume_device != "" }
+disk_setup:
+  ${data_volume_device}:
+    table_type: 'gpt'
+    layout: true
+    overwrite: false
+
+fs_setup:
+  - label: workspace
+    filesystem: ext4
+    device: ${data_volume_device}
+    partition: 1
+
+mounts:
+  - [${data_volume_device}p1, /home/${codeserver_user}/workspace, ext4, "defaults,nofail", "0", "2"]
+%{ endif }
+
+# Write configuration files
+write_files:
+  # Code-server configuration
+  - path: /home/${codeserver_user}/.config/code-server/config.yaml
+    owner: ${codeserver_user}:${codeserver_user}
+    permissions: '0644'
+    content: |
+      bind-addr: 127.0.0.1:8080
+      auth: password
+      password: ${random_password}
+      cert: false
+
+  # Nginx configuration for reverse proxy
+  - path: /etc/nginx/sites-available/code-server
+    permissions: '0644'
+    content: |
+      server {
+          listen 80;
+          %{ if domain_name != "" }
+          server_name ${domain_name};
+          %{ else }
+          server_name _;
+          %{ endif }
+          
+          location / {
+              proxy_pass http://127.0.0.1:8080;
+              proxy_http_version 1.1;
+              proxy_set_header Upgrade $http_upgrade;
+              proxy_set_header Connection 'upgrade';
+              proxy_set_header Host $host;
+              proxy_set_header X-Real-IP $remote_addr;
+              proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+              proxy_set_header X-Forwarded-Proto $scheme;
+              proxy_cache_bypass $http_upgrade;
+              proxy_read_timeout 86400;
+          }
+      }
+
+  # Cloudflared service configuration (if tunnel enabled)
+  %{ if enable_cloudflare_tunnel }
+  - path: /etc/systemd/system/cloudflared.service
+    permissions: '0644'
+    content: |
+      [Unit]
+      Description=Cloudflare Tunnel
+      After=network.target
+
+      [Service]
+      Type=simple
+      User=root
+      ExecStart=/usr/local/bin/cloudflared tunnel --no-autoupdate run --token ${cloudflare_tunnel_token}
+      Restart=on-failure
+      RestartSec=5s
+
+      [Install]
+      WantedBy=multi-user.target
+  %{ endif }
+
+  # Code-server systemd service
+  - path: /etc/systemd/system/code-server@.service
+    permissions: '0644'
+    content: |
+      [Unit]
+      Description=code-server
+      After=network.target
+
+      [Service]
+      Type=exec
+      ExecStart=/usr/bin/code-server
+      Restart=always
+      User=%i
+      Environment=HOME=/home/%i
+
+      [Install]
+      WantedBy=multi-user.target
+
+  # Installation script
+  - path: /opt/setup-code-server.sh
+    permissions: '0755'
+    content: |
+      #!/bin/bash
+      set -euo pipefail
+      
+      echo "=== Starting Code-Server Setup ==="
+      
+      # Function to log with timestamp
+      log() {
+          echo "[$(date '+%Y-%m-%d %H:%M:%S')] $1"
+      }
+      
+      # Install code-server
+      log "Installing code-server version ${codeserver_version}"
+      curl -fsSL https://code-server.dev/install.sh | sh -s -- --version=${codeserver_version}
+      
+      # Create necessary directories
+      log "Creating directories"
+      mkdir -p /home/${codeserver_user}/.config/code-server
+      mkdir -p /home/${codeserver_user}/workspace
+      %{ if data_volume_device != "" }
+      # Wait for volume to be mounted
+      while ! mountpoint -q /home/${codeserver_user}/workspace; do
+          log "Waiting for workspace volume to be mounted..."
+          sleep 5
+      done
+      %{ endif }
+      
+      # Set ownership
+      chown -R ${codeserver_user}:${codeserver_user} /home/${codeserver_user}
+      
+      # Install Cloudflared if tunnel is enabled
+      %{ if enable_cloudflare_tunnel }
+      log "Installing cloudflared"
+      wget -q https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64 -O /usr/local/bin/cloudflared
+      chmod +x /usr/local/bin/cloudflared
+      %{ endif }
+      
+      # Configure nginx
+      log "Configuring nginx"
+      ln -sf /etc/nginx/sites-available/code-server /etc/nginx/sites-enabled/
+      rm -f /etc/nginx/sites-enabled/default
+      nginx -t && systemctl reload nginx
+      
+      # Setup HTTPS with Let's Encrypt (if enabled and not using Cloudflare tunnel)
+      %{ if enable_https && !enable_cloudflare_tunnel }
+      if [ "${domain_name}" != "" ]; then
+          log "Setting up HTTPS with Let's Encrypt for ${domain_name}"
+          certbot --nginx -d ${domain_name} --non-interactive --agree-tos --email admin@${domain_name} --redirect
+      fi
+      %{ endif }
+      
+      # Enable and start services
+      log "Starting services"
+      systemctl enable nginx
+      systemctl start nginx
+      
+      %{ if enable_cloudflare_tunnel }
+      systemctl enable cloudflared
+      systemctl start cloudflared
+      %{ endif }
+      
+      # Enable code-server service for user
+      systemctl enable code-server@${codeserver_user}
+      systemctl start code-server@${codeserver_user}
+      
+      # Install VS Code extensions
+      log "Installing VS Code extensions"
+      sudo -u ${codeserver_user} code-server --install-extension ms-vscode.vscode-typescript-next
+      sudo -u ${codeserver_user} code-server --install-extension ms-python.python
+      sudo -u ${codeserver_user} code-server --install-extension ms-vscode.vscode-json
+      sudo -u ${codeserver_user} code-server --install-extension HashiCorp.terraform
+      sudo -u ${codeserver_user} code-server --install-extension ms-vscode.docker
+      
+      # Create a sample project
+      log "Creating sample project"
+      sudo -u ${codeserver_user} mkdir -p /home/${codeserver_user}/workspace/sample-project
+      cat > /home/${codeserver_user}/workspace/sample-project/README.md << 'EOF'
+      # Welcome to Your Code Server!
+      
+      This is your personal development environment running on OCI Always Free tier.
+      
+      ## Features Included
+      - VS Code Server with extensions
+      - Docker support
+      - Git integration
+      - Node.js and Python
+      - Nginx reverse proxy
+      %{ if enable_cloudflare_tunnel }
+      - Cloudflare Tunnel for secure access
+      %{ endif }
+      %{ if enable_https }
+      - HTTPS with Let's Encrypt
+      %{ endif }
+      
+      ## Useful Commands
+      - `docker --version` - Check Docker installation
+      - `git --version` - Check Git installation
+      - `node --version` - Check Node.js version
+      - `python3 --version` - Check Python version
+      
+      ## File Locations
+      - Workspace: `/home/${codeserver_user}/workspace`
+      - Code-server config: `/home/${codeserver_user}/.config/code-server/config.yaml`
+      %{ if data_volume_device != "" }
+      - Persistent storage: Mounted on `/home/${codeserver_user}/workspace`
+      %{ endif }
+      
+      Happy coding! 🚀
+      EOF
+      
+      chown -R ${codeserver_user}:${codeserver_user} /home/${codeserver_user}/workspace
+      
+      log "=== Code-Server Setup Complete ==="
+      
+      # Display access information
+      echo ""
+      echo "=================================="
+      echo "Code-Server Installation Complete"
+      echo "=================================="
+      %{ if enable_cloudflare_tunnel }
+      echo "Access URL: https://${domain_name}"
+      echo "Authentication: Cloudflare Access (configured emails)"
+      %{ else }
+      echo "Access URL: http://$(curl -s ifconfig.me):80"
+      %{ if enable_https }
+      echo "HTTPS: Available after Let's Encrypt setup"
+      %{ endif }
+      echo "Password: Check /home/${codeserver_user}/.config/code-server/config.yaml"
+      %{ endif }
+      echo "=================================="
+
+# Generate random password for code-server
+runcmd:
+  # Wait for system to be ready
+  - sleep 30
+  
+  # Generate random password and update config
+  - |
+    PASSWORD=$(openssl rand -base64 32)
+    sed -i "s/password: \${random_password}/password: $PASSWORD/" /home/${codeserver_user}/.config/code-server/config.yaml
+    echo "Code-server password: $PASSWORD" > /home/${codeserver_user}/code-server-password.txt
+    chown ${codeserver_user}:${codeserver_user} /home/${codeserver_user}/code-server-password.txt
+    chmod 600 /home/${codeserver_user}/code-server-password.txt
+  
+  # Run setup script
+  - /opt/setup-code-server.sh
+  
+  # Clean up
+  - apt autoremove -y
+  - apt autoclean
+
+# Final system configuration
+final_message: |
+  ================================================================
+  Code-Server deployment completed successfully!
+  
+  Instance: ${project_name}-${environment}
+  User: ${codeserver_user}
+  %{ if enable_cloudflare_tunnel }
+  Access: https://${domain_name}
+  %{ else }
+  Access: http://[INSTANCE_IP]
+  %{ endif }
+  
+  Check /home/${codeserver_user}/code-server-password.txt for the password.
+  ================================================================
