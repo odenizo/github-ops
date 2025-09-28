@@ -1,0 +1,116 @@
+name: Sync GitHub Docs Copilot Content
+
+on:
+  # Run daily at 6 AM UTC
+  schedule:
+    - cron: '0 6 * * *'
+  
+  # Allow manual trigger
+  workflow_dispatch:
+    inputs:
+      force_update:
+        description: 'Force update even if no changes detected'
+        required: false
+        default: 'false'
+        type: boolean
+  
+  # Run on push to main branch (for testing)
+  push:
+    branches: [ main ]
+    paths: 
+      - '.github/workflows/sync-github-docs-copilot.yml'
+
+jobs:
+  sync-copilot-docs:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+    
+    steps:
+      - name: Checkout current repository
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          fetch-depth: 0
+      
+      - name: Setup Git configuration
+        run: |
+          git config --local user.email "action@github.com"
+          git config --local user.name "GitHub Action"
+      
+      - name: Create docs directory if not exists
+        run: |
+          mkdir -p docs/copilot
+      
+      - name: Clone GitHub docs repository
+        run: |
+          # Clone github/docs repo to a temporary directory
+          git clone --depth 1 --filter=blob:none --sparse https://github.com/github/docs.git temp-github-docs
+          cd temp-github-docs
+          git sparse-checkout init --cone
+          git sparse-checkout set content/copilot
+      
+      - name: Check for changes in copilot content
+        id: check_changes
+        run: |
+          # Copy the content from github/docs to our docs directory
+          if [ -d "temp-github-docs/content/copilot" ]; then
+            # Remove existing content but preserve the directory
+            rm -rf docs/copilot/*
+            # Copy new content
+            cp -r temp-github-docs/content/copilot/* docs/copilot/ 2>/dev/null || true
+            
+            # Check if there are any changes
+            git add docs/copilot
+            if git diff --cached --quiet && [ "${{ github.event.inputs.force_update }}" != "true" ]; then
+              echo "No changes detected in GitHub docs copilot content"
+              echo "has_changes=false" >> $GITHUB_OUTPUT
+            else
+              echo "Changes detected in GitHub docs copilot content"
+              echo "has_changes=true" >> $GITHUB_OUTPUT
+            fi
+          else
+            echo "GitHub docs copilot directory not found"
+            echo "has_changes=false" >> $GITHUB_OUTPUT
+          fi
+      
+      - name: Get latest commit info from source
+        id: source_info
+        run: |
+          cd temp-github-docs
+          echo "source_commit=$(git rev-parse HEAD)" >> $GITHUB_OUTPUT
+          echo "source_commit_short=$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
+          echo "source_commit_date=$(git log -1 --format=%ci)" >> $GITHUB_OUTPUT
+      
+      - name: Commit and push changes
+        if: steps.check_changes.outputs.has_changes == 'true'
+        run: |
+          # Create commit with reference to source
+          git add docs/copilot
+          git commit -m "Sync GitHub docs copilot content
+
+          Source: github/docs@${{ steps.source_info.outputs.source_commit_short }}
+          Date: ${{ steps.source_info.outputs.source_commit_date }}
+          
+          Auto-synced from https://github.com/github/docs/tree/main/content/copilot"
+          
+          git push origin ${{ github.ref_name }}
+      
+      - name: Create summary
+        run: |
+          echo "## Sync Results" >> $GITHUB_STEP_SUMMARY
+          if [ "${{ steps.check_changes.outputs.has_changes }}" == "true" ]; then
+            echo "✅ **Changes detected and synced**" >> $GITHUB_STEP_SUMMARY
+            echo "- Source commit: \`${{ steps.source_info.outputs.source_commit_short }}\`" >> $GITHUB_STEP_SUMMARY
+            echo "- Source date: ${{ steps.source_info.outputs.source_commit_date }}" >> $GITHUB_STEP_SUMMARY
+            echo "- Target: \`docs/copilot/\`" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "ℹ️ **No changes detected**" >> $GITHUB_STEP_SUMMARY
+            echo "The copilot documentation is already up to date." >> $GITHUB_STEP_SUMMARY
+          fi
+      
+      - name: Cleanup
+        if: always()
+        run: |
+          rm -rf temp-github-docs
