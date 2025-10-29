@@ -10,6 +10,7 @@ redirect_from:
   - /copilot/using-github-copilot/guides-on-using-github-copilot/choosing-the-right-ai-tool-for-your-task
   - /copilot/tutorials/choosing-the-right-ai-tool-for-your-task
   - /copilot/concepts/choosing-the-right-ai-tool-for-your-task
+  - /copilot/concepts/ai-tools
 contentType: concepts
 ---
 

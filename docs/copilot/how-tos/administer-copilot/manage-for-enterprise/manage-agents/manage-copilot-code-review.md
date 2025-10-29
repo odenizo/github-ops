@@ -8,6 +8,8 @@ versions:
 topics:
   - Copilot
 shortTitle: 'Manage {% data variables.copilot.copilot_code-review_short %}'
+redirect_from:
+  - /copilot/how-tos/administer-copilot/manage-for-enterprise/manage-copilot-code-review
 contentType: how-tos
 ---
 
@@ -19,16 +21,14 @@ For more information about {% data variables.copilot.copilot_for_prs %}, see [AU
 
 ## Enabling {% data variables.copilot.copilot_code-review_short %} for your {% data variables.product.prodname_copilot_short %} subscribers
 
-You can enable {% data variables.copilot.copilot_code-review_short %} and {% data variables.copilot.copilot_for_prs %} for your members on the {% data variables.product.prodname_copilot_short %} policies page for your enterprise. See [AUTOTITLE](/copilot/managing-copilot/managing-copilot-for-your-enterprise/managing-policies-and-features-for-copilot-in-your-enterprise#defining-policies-for-your-enterprise).
+You can allow your members to use {% data variables.copilot.copilot_code-review_short %} and {% data variables.copilot.copilot_for_prs %} from the AI Controls tab for your enterprise. See [AUTOTITLE](/copilot/managing-copilot/managing-copilot-for-your-enterprise/managing-policies-and-features-for-copilot-in-your-enterprise#defining-policies-for-your-enterprise).
 
-* "Enabled" means all users granted a {% data variables.product.prodname_copilot_short %} license by any of your organizations will be able to use the feature.
-* "Disabled" means no users granted a {% data variables.product.prodname_copilot_short %} license by your organizations will be able to use the feature.
-* "No policy" means organization owners in each of your organizations will be able to decide if their {% data variables.product.prodname_copilot_short %} licensees can use the feature.
+> [!NOTE]
+>
+> {% data reusables.copilot.code-review.preview-note %}
+> * To participate in the {% data variables.release-phases.public_preview %}, you must first enable **{% data variables.product.prodname_copilot_short %} in {% data variables.product.prodname_dotcom_the_website %} > Opt in to preview features** from the "{% data variables.product.prodname_copilot_short %}" page of your enterprise's AI Controls.
 
-### Next steps
-
-* If you selected **Enabled**, tell organization owners that these features are enabled for all members.
-* If you selected **No policy**, discuss member enablement with organization owners.
+{% data reusables.enterprise-accounts.policy-enablement-next-steps %}
 
 ## Disabling {% data variables.copilot.copilot_code-review_short %} in your repositories
 
@@ -38,14 +38,7 @@ If there are {% data variables.copilot.copilot_pro_short %} or {% data variables
 
 Alternatively, you can disable the agent for all repositories owned by your enterprise.
 
-<!-- expires 2025-10-28 -->
-<!-- Part of the Copilot direct licensing rollout -->
-<!-- Expired content will be addressed by the Drivers team -->
-
 {% data reusables.enterprise-accounts.access-enterprise %}
-{% data reusables.enterprise-accounts.policies-tab %}
-{% data reusables.enterprise-accounts.copilot-tab %}
-{% data reusables.enterprise-accounts.copilot-policies-tab %}
-1. Select **Block {% data variables.copilot.copilot_code-review_short %} in all enterprise repositories**.
-
-<!-- end expires 2025-10-28 -->
+{% data reusables.enterprise-accounts.ai-controls-tab %}
+1. In the "Installed Agents" section, click **{% data variables.copilot.copilot_code-review_short %}**.
+1. In the "{% data variables.copilot.copilot_code-review_short %}" section, next to "Block {% data variables.copilot.copilot_code-review_short %} in all enterprise repositories", click the toggle.
