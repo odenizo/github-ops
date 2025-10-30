@@ -12,6 +12,8 @@ redirect_from:
   - /copilot/concepts/code-review/code-review
   - /copilot/concepts/code-review
 contentType: concepts
+category: 
+  - Learn about Copilot
 ---
 
 ## Introduction
@@ -35,7 +37,7 @@ This article provides an overview of {% data variables.copilot.copilot_code-revi
 {% data variables.copilot.copilot_code-review_short %} has several new tools that are in {% data variables.release-phases.public_preview %} and subject to change.
 
 * **Full project context gathering** to provide more specific, accurate, and contextually aware code reviews.
-* **Support for deterministic detections like {% data variables.product.prodname_codeql %} and security findings**, to deliver more high-signal, consistent findings for security and quality.
+* **Support for deterministic detections with {% data variables.product.prodname_codeql %}**, to deliver more high-signal, consistent findings for quality.
 * **The ability to pass suggestions to {% data variables.copilot.copilot_coding_agent %}**, for automated creation of a new pull request against your branch with the suggested fixes applied.
 
 You are not required to have {% data variables.product.prodname_code_scanning %} and {% data variables.product.prodname_actions %} enabled in your organization or enterprise to use the {% data variables.copilot.copilot_code-review-tools_short %}.
@@ -59,7 +61,7 @@ In the event that {% data variables.product.prodname_actions %} is unavailable o
 * Xcode
 * JetBrains IDEs
 
-{% data variables.copilot.copilot_code-review_short %} is—with one exception—a premium feature, available with the {% data variables.copilot.copilot_pro_short %}, {% data variables.copilot.copilot_pro_plus_short %}, {% data variables.copilot.copilot_business_short %}, and {% data variables.copilot.copilot_enterprise_short %} plans. See [Copilot plans](https://github.com/features/copilot/plans?ref_product=copilot&ref_type=purchase&ref_style=text&utm_source=docs-signup-copilot&utm_medium=docs&utm_campaign=universe25).
+{% data variables.copilot.copilot_code-review_short %} is—with one exception—a premium feature, available with the {% data variables.copilot.copilot_pro_short %}, {% data variables.copilot.copilot_pro_plus_short %}, {% data variables.copilot.copilot_business_short %}, and {% data variables.copilot.copilot_enterprise_short %} plans. See [Copilot plans](https://github.com/features/copilot/plans?ref_product=copilot&ref_type=purchase&ref_style=text&utm_source=docs-signup-copilot&utm_medium=docs&utm_campaign=universe25post).
 
 The exception is the review of a selection of code within a file in {% data variables.product.prodname_vscode %}. This is a standard feature available to all {% data variables.product.prodname_copilot_short %} users in {% data variables.product.prodname_vscode_shortname %}.
 
