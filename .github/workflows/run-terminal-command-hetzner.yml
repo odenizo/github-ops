@@ -1,0 +1,237 @@
+name: Run Terminal Command - Hetzner VM
+
+on:
+  workflow_dispatch:
+    inputs:
+      command:
+        description: 'Terminal command to execute'
+        required: true
+        type: string
+        default: 'echo "Hetzner VM Runner Test"'
+      
+      runner_label:
+        description: 'Runner label (self-hosted, hetzner, secondary)'
+        required: false
+        type: choice
+        options:
+          - self-hosted
+          - self-hosted,linux,x64
+          - self-hosted,linux,x64,hetzner
+          - self-hosted,linux,x64,hetzner,secondary
+        default: 'self-hosted,linux,x64,hetzner'
+      
+      use_parallel:
+        description: 'Run on multiple runners in parallel'
+        required: false
+        type: boolean
+        default: false
+      
+      log_level:
+        description: 'Logging level'
+        required: false
+        type: choice
+        options:
+          - debug
+          - info
+          - warn
+          - error
+        default: info
+
+jobs:
+  # Primary job: Run on single Hetzner runner
+  hetzner_single:
+    name: Execute on Hetzner VM (Primary)
+    runs-on: [self-hosted, linux, x64, hetzner]
+    
+    # Only run if parallel mode is disabled
+    if: ${{ !inputs.use_parallel }}
+    
+    env:
+      LOG_LEVEL: ${{ inputs.log_level }}
+      RUNNER_ENVIRONMENT: hetzner
+      COMMAND_TIMEOUT: 3600
+    
+    steps:
+      - name: 🏃 Print Runner Information
+        run: |
+          echo "═══════════════════════════════════════════════════════"
+          echo "📍 Runner Information"
+          echo "═══════════════════════════════════════════════════════"
+          echo "Runner: ${{ runner.name }}"
+          echo "OS: ${{ runner.os }}"
+          echo "Arch: ${{ runner.arch }}"
+          echo "Hostname: $(hostname)"
+          echo "CPU Cores: $(nproc)"
+          echo "Memory: $(free -h | grep Mem | awk '{print $2}')"
+          echo "Disk: $(df -h / | awk 'NR==2 {print $2, $3, $4}')"
+          echo "Docker Status: $(docker ps -q | wc -l) containers running"
+          echo "═══════════════════════════════════════════════════════"
+      
+      - name: 🔍 Pre-execution Health Check
+        run: |
+          echo "[$(date '+%Y-%m-%d %H:%M:%S')] Starting health checks..."
+          
+          # Check Docker
+          if ! command -v docker &> /dev/null; then
+            echo "⚠️  Docker not found"
+            exit 1
+          fi
+          echo "✅ Docker: $(docker --version)"
+          
+          # Check Docker daemon
+          if ! docker ps &> /dev/null; then
+            echo "❌ Docker daemon not accessible"
+            exit 1
+          fi
+          echo "✅ Docker daemon: Running"
+          
+          # Check available runners
+          echo "✅ Available runners:"
+          docker ps --filter "label=service=github-runner-1" --filter "label=service=github-runner-2" --format "table {{.Names}}\t{{.Status}}"
+          
+          echo "[$(date '+%Y-%m-%d %H:%M:%S')] Health checks complete"
+      
+      - name: 💾 Setup Output Directory
+        run: |
+          mkdir -p outputs/hetzner/{logs,artifacts,metrics}
+          echo "Output directory ready at: $PWD/outputs/hetzner"
+      
+      - name: 🚀 Execute Command
+        id: execute
+        run: |
+          set +e  # Don't exit on error, capture it
+          
+          echo "[$(date '+%Y-%m-%d %H:%M:%S')] Executing command: ${{ inputs.command }}"
+          echo "═══════════════════════════════════════════════════════"
+          
+          # Capture command output and exit code
+          OUTPUT=$(mktemp)
+          DURATION_START=$(date +%s)
+          
+          # Execute with timeout
+          timeout $COMMAND_TIMEOUT bash -c "${{ inputs.command }}" 2>&1 | tee "$OUTPUT"
+          EXIT_CODE=${PIPESTATUS[0]}
+          
+          DURATION_END=$(date +%s)
+          DURATION=$((DURATION_END - DURATION_START))
+          
+          echo "═══════════════════════════════════════════════════════"
+          echo "[$(date '+%Y-%m-%d %H:%M:%S')] Command execution complete"
+          
+          # Export results
+          echo "exit_code=$EXIT_CODE" >> $GITHUB_OUTPUT
+          echo "duration=$DURATION" >> $GITHUB_OUTPUT
+          
+          # Copy to artifacts
+          cp "$OUTPUT" outputs/hetzner/logs/command_output.log
+          cat "$OUTPUT" >> $GITHUB_STEP_SUMMARY
+          
+          # Return exit code
+          exit $EXIT_CODE
+      
+      - name: 📊 Capture Metrics
+        if: always()
+        run: |
+          echo "# Execution Metrics" >> outputs/hetzner/metrics/stats.md
+          echo "" >> outputs/hetzner/metrics/stats.md
+          echo "- **Exit Code:** ${{ steps.execute.outputs.exit_code }}" >> outputs/hetzner/metrics/stats.md
+          echo "- **Duration:** ${{ steps.execute.outputs.duration }}s" >> outputs/hetzner/metrics/stats.md
+          echo "- **Timestamp:** $(date -u +'%Y-%m-%dT%H:%M:%SZ')" >> outputs/hetzner/metrics/stats.md
+          echo "- **Runner:** $(hostname)" >> outputs/hetzner/metrics/stats.md
+          echo "- **CPU Usage:** $(top -bn1 | grep Cpu | awk '{print $2}')" >> outputs/hetzner/metrics/stats.md
+          echo "- **Memory Usage:** $(free | awk 'NR==2{print ($3/$2)*100}'|awk '{printf("%.1f%%\n", $1)}')" >> outputs/hetzner/metrics/stats.md
+          
+          cat outputs/hetzner/metrics/stats.md
+      
+      - name: 📤 Upload Artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: hetzner-execution-logs
+          path: outputs/hetzner/
+          retention-days: 7
+  
+  # Parallel job 1: Run on Primary Runner
+  hetzner_parallel_primary:
+    name: Execute on Hetzner Primary (Parallel)
+    runs-on: [self-hosted, linux, x64, hetzner]
+    
+    if: ${{ inputs.use_parallel }}
+    
+    steps:
+      - name: 🏃 Runner Info - Primary
+        run: |
+          echo "Executing on: $(hostname) (Primary)"
+          echo "Available Memory: $(free -h | grep Mem | awk '{print $2}')"
+      
+      - name: 🚀 Execute on Primary
+        run: ${{ inputs.command }}
+  
+  # Parallel job 2: Run on Secondary Runner
+  hetzner_parallel_secondary:
+    name: Execute on Hetzner Secondary (Parallel)
+    runs-on: [self-hosted, linux, x64, hetzner, secondary]
+    
+    if: ${{ inputs.use_parallel }}
+    
+    steps:
+      - name: 🏃 Runner Info - Secondary
+        run: |
+          echo "Executing on: $(hostname) (Secondary)"
+          echo "Available Memory: $(free -h | grep Mem | awk '{print $2}')"
+      
+      - name: 🚀 Execute on Secondary
+        run: ${{ inputs.command }}
+  
+  # Cleanup and reporting
+  summary:
+    name: 📋 Summary Report
+    runs-on: ubuntu-latest
+    if: always()
+    needs: []
+    
+    steps:
+      - name: 📝 Generate Summary
+        run: |
+          echo "# Hetzner VM Workflow Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "## Execution Details" >> $GITHUB_STEP_SUMMARY
+          echo "- **Command:** \`${{ inputs.command }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "- **Mode:** ${{ inputs.use_parallel && 'Parallel' || 'Serial' }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Runner Label:** \`${{ inputs.runner_label }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "- **Log Level:** \`${{ inputs.log_level }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "- **Timestamp:** $(date -u +'%Y-%m-%dT%H:%M:%SZ')" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "## Next Steps" >> $GITHUB_STEP_SUMMARY
+          echo "1. Check execution artifacts in Actions tab" >> $GITHUB_STEP_SUMMARY
+          echo "2. Review runner logs: \`docker logs github-runner-1\`" >> $GITHUB_STEP_SUMMARY
+          echo "3. Monitor system: \`watch -n 1 docker stats\`" >> $GITHUB_STEP_SUMMARY
+
+# Workflow Trigger Usage
+#
+# Trigger via GitHub CLI:
+#   gh workflow run run-terminal-command-hetzner.yml \
+#     -f command="echo 'Hello from Hetzner'" \
+#     -f runner_label="self-hosted,linux,x64,hetzner" \
+#     -f use_parallel=false
+#
+# Trigger via GitHub UI:
+#   1. Go to Actions tab
+#   2. Select "Run Terminal Command - Hetzner VM"
+#   3. Click "Run workflow"
+#   4. Enter command and select runner
+#   5. Click "Run workflow"
+#
+# Available Labels:
+#   - self-hosted (all runners)
+#   - linux (all Linux runners)
+#   - x64 (64-bit architecture)
+#   - hetzner (Hetzner VM runners only)
+#   - secondary (secondary runner only)
+#
+# Integration with docker-compose:
+#   - Runners: github-runner-1 (4 cores, 16GB), github-runner-2 (2 cores, 8GB)
+#   - Network: runners bridge (172.25.0.0/16)
+#   - Socket: /var/run/docker.sock mounted for Docker-in-Docker
+#   - Volumes: /opt/github-runners/runner{1,2} for persistent storage
+#
