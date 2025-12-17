@@ -1,0 +1,328 @@
+name: Run Terminal Command - MacBook
+
+on:
+  workflow_dispatch:
+    inputs:
+      command:
+        description: 'Terminal command to execute on MacBook'
+        required: true
+        type: string
+        default: 'echo "MacBook Runner Test"'
+      
+      runner_label:
+        description: 'Runner label (macbook specific)'
+        required: false
+        type: choice
+        options:
+          - self-hosted
+          - self-hosted,macos
+          - self-hosted,macos,macbook
+          - self-hosted,macos,macbook,personal
+        default: 'self-hosted,macos,macbook'
+      
+      upload_to_hetzner:
+        description: 'Upload results to Hetzner VM via SSH'
+        required: false
+        type: boolean
+        default: true
+      
+      shell_type:
+        description: 'Shell to use for command execution'
+        required: false
+        type: choice
+        options:
+          - bash
+          - zsh
+          - fish
+        default: bash
+      
+      log_level:
+        description: 'Logging level'
+        required: false
+        type: choice
+        options:
+          - debug
+          - info
+          - warn
+          - error
+        default: info
+
+jobs:
+  # MacBook execution job
+  macbook_execute:
+    name: Execute on MacBook
+    runs-on: [self-hosted, macos, macbook]
+    
+    env:
+      LOG_LEVEL: ${{ inputs.log_level }}
+      RUNNER_ENVIRONMENT: macbook
+      COMMAND_TIMEOUT: 3600
+      SHELL_TYPE: ${{ inputs.shell_type }}
+    
+    steps:
+      - name: 🏃 Print MacBook Information
+        run: |
+          echo "═══════════════════════════════════════════════════════"
+          echo "📍 MacBook Runner Information"
+          echo "═══════════════════════════════════════════════════════"
+          echo "Runner: ${{ runner.name }}"
+          echo "OS: ${{ runner.os }}"
+          echo "Arch: ${{ runner.arch }}"
+          echo "Hostname: $(hostname)"
+          echo "User: $(whoami)"
+          echo "macOS Version: $(sw_vers -productVersion)"
+          echo "Build Version: $(sw_vers -buildVersion)"
+          echo "CPU Cores: $(sysctl -n hw.ncpu)"
+          echo "CPU Model: $(sysctl -n machdep.cpu.brand_string)"
+          echo "Memory: $(sysctl -n hw.memsize | awk '{printf "%.1f GB\n", $1/1024/1024/1024}')"
+          echo "Disk: $(df -h / | awk 'NR==2 {print $2, $3, $4}')"
+          echo "Python: $(python3 --version 2>&1)"
+          echo "Node: $(node --version 2>/dev/null || echo 'Not installed')"
+          echo "Xcode: $(xcode-select --print-path 2>/dev/null || echo 'Not configured')"
+          echo "═══════════════════════════════════════════════════════"
+      
+      - name: 🔍 Pre-execution Health Check
+        run: |
+          echo "[$(date '+%Y-%m-%d %H:%M:%S')] Starting MacBook health checks..."
+          
+          # Check if SSH is available (for Hetzner sync)
+          if ! command -v ssh &> /dev/null; then
+            echo "⚠️  SSH not found (required for Hetzner sync)"
+          else
+            echo "✅ SSH: $(ssh -V 2>&1)"
+          fi
+          
+          # Check if shell is available
+          if ! command -v $SHELL_TYPE &> /dev/null; then
+            echo "❌ Shell $SHELL_TYPE not found"
+            exit 1
+          fi
+          echo "✅ Shell: $SHELL_TYPE available"
+          
+          # Check Python
+          if command -v python3 &> /dev/null; then
+            echo "✅ Python: $(python3 --version 2>&1)"
+          else
+            echo "⚠️  Python not found"
+          fi
+          
+          # Check Node
+          if command -v node &> /dev/null; then
+            echo "✅ Node: $(node --version)"
+          else
+            echo "⚠️  Node not found"
+          fi
+          
+          # Check Xcode
+          if xcode-select --print-path &> /dev/null; then
+            echo "✅ Xcode: $(xcode-select --print-path)"
+          else
+            echo "⚠️  Xcode not configured"
+          fi
+          
+          # Check Git
+          if command -v git &> /dev/null; then
+            echo "✅ Git: $(git --version)"
+          else
+            echo "❌ Git not found"
+            exit 1
+          fi
+          
+          echo "[$(date '+%Y-%m-%d %H:%M:%S')] Health checks complete"
+      
+      - name: 💾 Setup Output Directory
+        run: |
+          mkdir -p outputs/macbook/{logs,artifacts,metrics}
+          echo "Output directory ready at: $PWD/outputs/macbook"
+      
+      - name: 🔄 Load Local Environment
+        run: |
+          echo "Loading local environment from ~/.bashrc..."
+          if [ -f ~/.bashrc ]; then
+            source ~/.bashrc
+            echo "✅ ~/.bashrc loaded"
+          fi
+          
+          if [ -f ~/.zshrc ]; then
+            source ~/.zshrc
+            echo "✅ ~/.zshrc loaded"
+          fi
+          
+          echo "Environment loaded. Working directory: $PWD"
+      
+      - name: 🚀 Execute Command
+        id: execute
+        run: |
+          set +e  # Don't exit on error, capture it
+          
+          echo "[$(date '+%Y-%m-%d %H:%M:%S')] Executing command: ${{ inputs.command }}"
+          echo "═══════════════════════════════════════════════════════"
+          
+          # Capture command output and exit code
+          OUTPUT=$(mktemp)
+          DURATION_START=$(date +%s)
+          
+          # Select shell for execution
+          case "$SHELL_TYPE" in
+            bash)
+              EXEC_SHELL="/bin/bash"
+              ;;
+            zsh)
+              EXEC_SHELL="/bin/zsh"
+              ;;
+            fish)
+              EXEC_SHELL="/usr/local/bin/fish"
+              ;;
+            *)
+              EXEC_SHELL="/bin/bash"
+              ;;
+          esac
+          
+          # Execute command
+          timeout $COMMAND_TIMEOUT $EXEC_SHELL -c "${{ inputs.command }}" 2>&1 | tee "$OUTPUT"
+          EXIT_CODE=${PIPESTATUS[0]}
+          
+          DURATION_END=$(date +%s)
+          DURATION=$((DURATION_END - DURATION_START))
+          
+          echo "═══════════════════════════════════════════════════════"
+          echo "[$(date '+%Y-%m-%d %H:%M:%S')] Command execution complete"
+          
+          # Export results
+          echo "exit_code=$EXIT_CODE" >> $GITHUB_OUTPUT
+          echo "duration=$DURATION" >> $GITHUB_OUTPUT
+          
+          # Copy to artifacts
+          cp "$OUTPUT" outputs/macbook/logs/command_output.log
+          cat "$OUTPUT" >> $GITHUB_STEP_SUMMARY
+          
+          # Return exit code
+          exit $EXIT_CODE
+      
+      - name: 📊 Capture Metrics
+        if: always()
+        run: |
+          echo "# MacBook Execution Metrics" >> outputs/macbook/metrics/stats.md
+          echo "" >> outputs/macbook/metrics/stats.md
+          echo "- **Exit Code:** ${{ steps.execute.outputs.exit_code }}" >> outputs/macbook/metrics/stats.md
+          echo "- **Duration:** ${{ steps.execute.outputs.duration }}s" >> outputs/macbook/metrics/stats.md
+          echo "- **Timestamp:** $(date -u +'%Y-%m-%dT%H:%M:%SZ')" >> outputs/macbook/metrics/stats.md
+          echo "- **Runner:** $(hostname)" >> outputs/macbook/metrics/stats.md
+          echo "- **CPU Usage:** $(top -l 1 -n 0 | grep 'CPU usage' | head -1)" >> outputs/macbook/metrics/stats.md
+          echo "- **Memory Usage:** $(vm_stat | grep 'Pages active' | awk '{print $3}')" >> outputs/macbook/metrics/stats.md
+          echo "- **Disk Usage:** $(df -h / | awk 'NR==2 {print $5}'|sed 's/%//') utilized" >> outputs/macbook/metrics/stats.md
+          
+          cat outputs/macbook/metrics/stats.md
+      
+      - name: 📮 SSH Check - Hetzner Connection
+        if: ${{ inputs.upload_to_hetzner }}
+        run: |
+          echo "Checking SSH connectivity to Hetzner VM..."
+          
+          # Check if SSH key exists
+          if [ -f ~/.ssh/id_rsa ] || [ -f ~/.ssh/id_ed25519 ]; then
+            echo "✅ SSH key found"
+          else
+            echo "⚠️  SSH key not found. Configure with:"
+            echo "   ssh-keygen -t ed25519 -f ~/.ssh/id_ed25519"
+            exit 1
+          fi
+          
+          # Test SSH connection (don't fail workflow)
+          if ssh -o ConnectTimeout=5 -o StrictHostKeyChecking=no runner@hetzner-vm "echo Hetzner connection OK" 2>/dev/null; then
+            echo "✅ Hetzner VM accessible via SSH"
+          else
+            echo "⚠️  Could not connect to Hetzner VM"
+            echo "   Configure SSH in ~/.ssh/config or provide connection details"
+          fi
+      
+      - name: 📑 Upload Results to Hetzner VM
+        if: ${{ inputs.upload_to_hetzner && always() }}
+        run: |
+          echo "Uploading results to Hetzner VM..."
+          
+          HETZNER_USER="${HETZNER_USER:-runner}"
+          HETZNER_HOST="${HETZNER_HOST:-hetzner-vm}"
+          REMOTE_PATH="/opt/github-runners/macbook-results/$(date +%Y-%m-%d)"
+          
+          # Try to sync if SSH is configured
+          if ssh-keyscan $HETZNER_HOST &>/dev/null; then
+            echo "Syncing to $HETZNER_USER@$HETZNER_HOST:$REMOTE_PATH"
+            rsync -av -e ssh outputs/macbook/ $HETZNER_USER@$HETZNER_HOST:$REMOTE_PATH/ || echo "Warning: rsync failed (non-critical)"
+          else
+            echo "⚠️  Hetzner host not accessible. Results will be saved locally only."
+          fi
+      
+      - name: 📤 Upload Artifacts to GitHub
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: macbook-execution-logs
+          path: outputs/macbook/
+          retention-days: 7
+
+  # Summary and reporting
+  summary:
+    name: 📋 Summary Report
+    runs-on: ubuntu-latest
+    if: always()
+    needs: []
+    
+    steps:
+      - name: 📝 Generate Summary
+        run: |
+          echo "# MacBook Workflow Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "## Execution Details" >> $GITHUB_STEP_SUMMARY
+          echo "- **Command:** \`${{ inputs.command }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "- **Runner Label:** \`${{ inputs.runner_label }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "- **Shell:** \`${{ inputs.shell_type }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "- **Upload to Hetzner:** ${{ inputs.upload_to_hetzner }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Log Level:** \`${{ inputs.log_level }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "- **Timestamp:** $(date -u +'%Y-%m-%dT%H:%M:%SZ')" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "## Environment" >> $GITHUB_STEP_SUMMARY
+          echo "**MacBook Setup (from personal-hq/CLAUDE.md):**" >> $GITHUB_STEP_SUMMARY
+          echo "- Device: MacBook (primary development)" >> $GITHUB_STEP_SUMMARY
+          echo "- Subscriptions: GitHub Copilot, Claude Pro" >> $GITHUB_STEP_SUMMARY
+          echo "- Integration: SSH to Hetzner VM for coordination" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "## Next Steps" >> $GITHUB_STEP_SUMMARY
+          echo "1. Check execution artifacts in Actions tab" >> $GITHUB_STEP_SUMMARY
+          echo "2. Review logs: \`cat outputs/macbook/logs/command_output.log\`" >> $GITHUB_STEP_SUMMARY
+          echo "3. View Hetzner sync status in SSH session" >> $GITHUB_STEP_SUMMARY
+          echo "4. For coordination: Use multi-agent pattern from personal-hq/AGENTS.md" >> $GITHUB_STEP_SUMMARY
+
+# Workflow Trigger Usage
+#
+# Trigger via GitHub CLI:
+#   gh workflow run run-terminal-command-macbook.yml \
+#     -f command="swift --version" \
+#     -f runner_label="self-hosted,macos,macbook" \
+#     -f shell_type="bash"
+#
+# Trigger via GitHub UI:
+#   1. Go to Actions tab
+#   2. Select "Run Terminal Command - MacBook"
+#   3. Click "Run workflow"
+#   4. Enter command and select shell
+#   5. Click "Run workflow"
+#
+# Configuration:
+# Set environment variables in GitHub Secrets:
+#   - HETZNER_HOST: Hostname or IP of Hetzner VM
+#   - HETZNER_USER: SSH user for Hetzner VM
+#   - Add public SSH key to ~/.ssh/authorized_keys on Hetzner VM
+#
+# Setup Instructions:
+#   1. Configure SSH key: ssh-keygen -t ed25519 -f ~/.ssh/id_ed25519
+#   2. Add to GitHub Secrets (RUNNER_SSH_KEY)
+#   3. Update ~/.ssh/config with Hetzner VM details
+#   4. Test: ssh hetzner-vm echo OK
+#
+# Integration with multi-agent system (from personal-hq):
+#   - Use Claude Code (orchestrator) for complex commands
+#   - Delegate to Gemini CLI for data processing
+#   - GitHub Copilot for quick code suggestions
+#   - Results sync to Neo4j on Hetzner VM
+#
