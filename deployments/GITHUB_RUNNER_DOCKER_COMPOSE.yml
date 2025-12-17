@@ -1,0 +1,272 @@
+# GitHub Runners Docker Compose Configuration
+# Production-ready setup for Hetzner VM with resource allocation
+#
+# Usage:
+#   cd /opt/github-runners/docker-compose
+#   cp GITHUB_RUNNER_DOCKER_COMPOSE.yml docker-compose.yml
+#   cp .env.example .env
+#   # Edit .env with your tokens
+#   sudo docker-compose up -d
+
+version: '3.8'
+
+services:
+  # Primary GitHub Runner - Full-power build and deployment runner
+  runner1:
+    image: myoung34/github-runner:latest
+    container_name: github-runner-1
+    hostname: github-runner-1
+    
+    # Automatic restart on failure or server reboot
+    restart: unless-stopped
+    
+    environment:
+      # GitHub repository configuration
+      - REPO_URL=https://github.com/odenizo
+      - RUNNER_SCOPE=personal  # or 'org' for organization runners
+      
+      # Authentication tokens (from .env file)
+      - RUNNER_TOKEN=${RUNNER_TOKEN_1}
+      - ACCESS_TOKEN=${GITHUB_PAT}
+      
+      # Runner configuration
+      - RUNNER_NAME=github-runner-1
+      - RUNNER_WORKDIR=/var/run/act
+      - RUNNER_GROUP=default
+      - RUNNER_LABELS=self-hosted,linux,x64,hetzner
+      
+      # Enable runner features
+      - GITHUB_RUNNER_ALLOW_RUNASROOT=true
+      
+      # Disable ephemeral mode (runners stay registered)
+      - EPHEMERAL=false
+      
+      # Additional environment variables
+      - CONFIGURE_DOCKER=true      # Auto-configure Docker socket
+      - DOCKER_HOST=unix:///var/run/docker.sock
+    
+    # Volume mounts
+    volumes:
+      # Docker daemon socket for Docker-in-Docker capability
+      - /var/run/docker.sock:/var/run/docker.sock
+      
+      # Runner working directory (persistent storage)
+      - runner1-work:/var/run/act
+      
+      # Optional: SSH keys for deployment
+      # - ~/.ssh:/root/.ssh:ro
+    
+    # Network configuration
+    networks:
+      - runners
+    
+    # Port mapping (for monitoring)
+    ports:
+      - "8091:8080"  # Health check port
+    
+    # Resource allocation
+    cpus: '4'           # 4 CPU cores
+    mem_limit: 16g      # 16GB RAM limit
+    memswap_limit: 18g  # Allow 2GB swap
+    
+    # Health check configuration
+    healthcheck:
+      # Check if Runner.Listener process is running
+      test: ["CMD", "ps", "aux"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+    
+    # Logging configuration
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "100m"
+        max-file: "3"
+        labels: "service=github-runner-1"
+
+  # Secondary GitHub Runner - Parallel job execution
+  runner2:
+    image: myoung34/github-runner:latest
+    container_name: github-runner-2
+    hostname: github-runner-2
+    
+    restart: unless-stopped
+    
+    environment:
+      - REPO_URL=https://github.com/odenizo
+      - RUNNER_SCOPE=personal
+      - RUNNER_TOKEN=${RUNNER_TOKEN_2}
+      - ACCESS_TOKEN=${GITHUB_PAT}
+      - RUNNER_NAME=github-runner-2
+      - RUNNER_WORKDIR=/var/run/act
+      - RUNNER_GROUP=default
+      - RUNNER_LABELS=self-hosted,linux,x64,hetzner,secondary
+      - GITHUB_RUNNER_ALLOW_RUNASROOT=true
+      - EPHEMERAL=false
+      - CONFIGURE_DOCKER=true
+      - DOCKER_HOST=unix:///var/run/docker.sock
+    
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - runner2-work:/var/run/act
+    
+    networks:
+      - runners
+    
+    ports:
+      - "8092:8080"
+    
+    cpus: '2'           # 2 CPU cores
+    mem_limit: 8g       # 8GB RAM limit
+    memswap_limit: 9g   # Allow 1GB swap
+    
+    healthcheck:
+      test: ["CMD", "ps", "aux"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+    
+    # Depend on runner1 starting first (optional)
+    depends_on:
+      - runner1
+    
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "100m"
+        max-file: "3"
+        labels: "service=github-runner-2"
+
+  # Optional: Third GitHub Runner for high-concurrency scenarios
+  # Uncomment to enable
+  #
+  # runner3:
+  #   image: myoung34/github-runner:latest
+  #   container_name: github-runner-3
+  #   hostname: github-runner-3
+  #   restart: unless-stopped
+  #   environment:
+  #     - REPO_URL=https://github.com/odenizo
+  #     - RUNNER_SCOPE=personal
+  #     - RUNNER_TOKEN=${RUNNER_TOKEN_3}
+  #     - ACCESS_TOKEN=${GITHUB_PAT}
+  #     - RUNNER_NAME=github-runner-3
+  #     - RUNNER_WORKDIR=/var/run/act
+  #     - RUNNER_GROUP=default
+  #     - RUNNER_LABELS=self-hosted,linux,x64,hetzner,tertiary
+  #     - GITHUB_RUNNER_ALLOW_RUNASROOT=true
+  #     - EPHEMERAL=false
+  #     - CONFIGURE_DOCKER=true
+  #     - DOCKER_HOST=unix:///var/run/docker.sock
+  #   volumes:
+  #     - /var/run/docker.sock:/var/run/docker.sock
+  #     - runner3-work:/var/run/act
+  #   networks:
+  #     - runners
+  #   ports:
+  #     - "8093:8080"
+  #   cpus: '2'
+  #   mem_limit: 8g
+  #   memswap_limit: 9g
+  #   healthcheck:
+  #     test: ["CMD", "ps", "aux"]
+  #     interval: 10s
+  #     timeout: 5s
+  #     retries: 3
+  #     start_period: 30s
+  #   depends_on:
+  #     - runner1
+  #   logging:
+  #     driver: "json-file"
+  #     options:
+  #       max-size: "100m"
+  #       max-file: "3"
+  #       labels: "service=github-runner-3"
+
+# Named volumes for persistent runner data
+volumes:
+  runner1-work:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: /opt/github-runners/runner1
+  
+  runner2-work:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: /opt/github-runners/runner2
+  
+  # runner3-work:
+  #   driver: local
+  #   driver_opts:
+  #     type: none
+  #     o: bind
+  #     device: /opt/github-runners/runner3
+
+# Network configuration
+networks:
+  runners:
+    driver: bridge
+    driver_opts:
+      # Enable IP masquerading
+      com.docker.network.bridge.enable_ip_masquerade: "true"
+    ipam:
+      config:
+        - subnet: 172.25.0.0/16
+
+# Configuration comments and notes:
+#
+# ENVIRONMENT VARIABLES:
+#   - REPO_URL: GitHub repository URL (https://github.com/owner or https://github.com/owner/repo)
+#   - RUNNER_TOKEN: Registration token from GitHub (expires after ~1 hour)
+#   - ACCESS_TOKEN: GitHub Personal Access Token for authentication
+#   - RUNNER_SCOPE: 'personal' for repos, 'org' for organization runners
+#   - EPHEMERAL: false = persistent registration, true = auto-remove after job
+#   - RUNNER_LABELS: Custom labels for workflow targeting
+#
+# RESOURCE ALLOCATION:
+#   - runner1: 4 cores + 16GB = Primary build runner
+#   - runner2: 2 cores + 8GB = Secondary parallel jobs
+#   - Total: 6 cores, 24GB (leaves headroom on 12-core, 128GB server)
+#
+# DOCKER-IN-DOCKER:
+#   - Docker socket mounted to enable container builds in workflows
+#   - Set CONFIGURE_DOCKER=true to auto-setup
+#   - Workflows can use: docker build, docker push, etc.
+#
+# HEALTH CHECKS:
+#   - Monitors Runner.Listener process
+#   - Auto-restart if process fails
+#   - Respects 30-second startup grace period
+#
+# PERSISTENT STORAGE:
+#   - runner1-work and runner2-work volumes persist job files
+#   - Prevents workflow data loss on container restart
+#   - Manual cleanup may be needed periodically
+#
+# LOGGING:
+#   - JSON driver with rotation
+#   - Max 100MB per file, keeps 3 files = 300MB total logs
+#   - Can be adjusted if verbose logging needed
+#
+# NETWORKING:
+#   - Custom 'runners' bridge network for container communication
+#   - runners can communicate with each other
+#   - runners can access host Docker daemon
+#   - External access restricted (no ports exposed to host network)
+#
+# PRODUCTION RECOMMENDATIONS:
+#   1. Use Docker secrets for sensitive tokens (not in .env)
+#   2. Enable container security options (--security-opt)
+#   3. Use read-only root filesystem where possible
+#   4. Implement log aggregation (ELK, Datadog)
+#   5. Set resource limits to prevent resource exhaustion
+#   6. Use image scanning for vulnerabilities
+#   7. Implement runner autoscaling for high-load scenarios
+#
