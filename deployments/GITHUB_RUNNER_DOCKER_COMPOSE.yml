@@ -7,6 +7,11 @@
 #   cp .env.example .env
 #   # Edit .env with your tokens
 #   sudo docker-compose up -d
+#
+# NOTE: Resource limits (cpus, memory) are specified in the 'deploy' section
+# for Docker Compose v3.8+ compliance. These limits work with Docker Swarm
+# and modern docker-compose versions. For non-Swarm environments, consider using
+# docker run flags or cgroup limits as an alternative.
 
 version: '3.8'
 
@@ -64,15 +69,21 @@ services:
     ports:
       - "8091:8080"  # Health check port
     
-    # Resource allocation
-    cpus: '4'           # 4 CPU cores
-    mem_limit: 16g      # 16GB RAM limit
-    memswap_limit: 18g  # Allow 2GB swap
+    # Resource allocation (Docker Compose v3.8 with deploy section)
+    deploy:
+      resources:
+        limits:
+          cpus: '4'           # 4 CPU cores
+          memory: 16g         # 16GB RAM limit
+        reservations:
+          cpus: '2'           # Reserve minimum 2 cores
+          memory: 8g          # Reserve minimum 8GB
     
     # Health check configuration
     healthcheck:
-      # Check if Runner.Listener process is running
-      test: ["CMD", "ps", "aux"]
+      # Check if GitHub runner process is active
+      # CORRECTED: Changed from generic 'ps aux' to specific process detection
+      test: ["CMD", "pgrep", "-f", "Runner.Listener"]
       interval: 10s
       timeout: 5s
       retries: 3
@@ -118,12 +129,19 @@ services:
     ports:
       - "8092:8080"
     
-    cpus: '2'           # 2 CPU cores
-    mem_limit: 8g       # 8GB RAM limit
-    memswap_limit: 9g   # Allow 1GB swap
+    # Resource allocation (corrected to deploy section)
+    deploy:
+      resources:
+        limits:
+          cpus: '2'           # 2 CPU cores
+          memory: 8g          # 8GB RAM limit
+        reservations:
+          cpus: '1'           # Reserve minimum 1 core
+          memory: 4g          # Reserve minimum 4GB
     
     healthcheck:
-      test: ["CMD", "ps", "aux"]
+      # CORRECTED: Specific process detection instead of generic ps aux
+      test: ["CMD", "pgrep", "-f", "Runner.Listener"]
       interval: 10s
       timeout: 5s
       retries: 3
@@ -168,11 +186,16 @@ services:
   #     - runners
   #   ports:
   #     - "8093:8080"
-  #   cpus: '2'
-  #   mem_limit: 8g
-  #   memswap_limit: 9g
+  #   deploy:
+  #     resources:
+  #       limits:
+  #         cpus: '2'
+  #         memory: 8g
+  #       reservations:
+  #         cpus: '1'
+  #         memory: 4g
   #   healthcheck:
-  #     test: ["CMD", "ps", "aux"]
+  #     test: ["CMD", "pgrep", "-f", "Runner.Listener"]
   #     interval: 10s
   #     timeout: 5s
   #     retries: 3
@@ -214,8 +237,8 @@ networks:
   runners:
     driver: bridge
     driver_opts:
-      # Enable IP masquerading
-      com.docker.network.bridge.enable_ip_masquerade: "true"
+      # Enable IP masquerading for NAT
+      com.docker.network.bridge.enable_ip_masquerading: "true"
     ipam:
       config:
         - subnet: 172.25.0.0/16
@@ -230,18 +253,22 @@ networks:
 #   - EPHEMERAL: false = persistent registration, true = auto-remove after job
 #   - RUNNER_LABELS: Custom labels for workflow targeting
 #
-# RESOURCE ALLOCATION:
-#   - runner1: 4 cores + 16GB = Primary build runner
-#   - runner2: 2 cores + 8GB = Secondary parallel jobs
-#   - Total: 6 cores, 24GB (leaves headroom on 12-core, 128GB server)
+# RESOURCE ALLOCATION (Docker Compose v3.8 with deploy section):
+#   - runner1: 4 cores + 16GB limits, 2 cores + 8GB reserved
+#   - runner2: 2 cores + 8GB limits, 1 core + 4GB reserved
+#   - Total limits: 6 cores, 24GB (leaves headroom on 12-core, 128GB server)
+#   - Total reserved: 3 cores, 12GB minimum guaranteed
+#   - Note: 'limits' define maximum usage, 'reservations' define guaranteed minimum
 #
 # DOCKER-IN-DOCKER:
 #   - Docker socket mounted to enable container builds in workflows
 #   - Set CONFIGURE_DOCKER=true to auto-setup
 #   - Workflows can use: docker build, docker push, etc.
 #
-# HEALTH CHECKS:
-#   - Monitors Runner.Listener process
+# HEALTH CHECKS (CORRECTED):
+#   - Now uses 'pgrep -f Runner.Listener' for specific process detection
+#   - Previous 'ps aux' was too generic and unreliable
+#   - Checks if the GitHub runner listener process is running
 #   - Auto-restart if process fails
 #   - Respects 30-second startup grace period
 #
@@ -269,4 +296,12 @@ networks:
 #   5. Set resource limits to prevent resource exhaustion
 #   6. Use image scanning for vulnerabilities
 #   7. Implement runner autoscaling for high-load scenarios
+#   8. Monitor resource usage and adjust limits based on actual workflow demands
+#
+# CORRECTIONS MADE (2025-12-17):
+#   - FIXED: Moved resource limits (cpus, memory) from service level to deploy.resources.limits
+#            (Docker Compose v3.8 does not support mem_limit, memswap_limit at service level)
+#   - FIXED: Changed healthcheck test from 'ps aux' to 'pgrep -f Runner.Listener' for reliability
+#   - ADDED: Resource reservations for guaranteed minimum resource allocation
+#   - ADDED: Clarifying comments about Docker Swarm compatibility
 #
