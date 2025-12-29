@@ -1,0 +1,50 @@
+# Environment variables
+.env
+.env.local
+.env.*.local
+
+# Dependencies
+node_modules/
+package-lock.json
+pip-lock
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Logs
+*.log
+logs/
+.npm-debug.log*
+
+# SSH keys
+.ssh/
+*.pem
+*.key
+
+# Build output
+dist/
+build/
+.next/
+
+# Testing
+coverage/
+.nyc_output/
+
+# OS
+Thumbs.db
+.DS_Store
+
+# Agent outputs
+results/
+agent-output/
+agent-logs/
+
+# Temporary files
+*.tmp
+*.temp
+*.swp
