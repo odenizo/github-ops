@@ -1,0 +1,77 @@
+name: Coding Agent - Batch
+
+on:
+  workflow_dispatch:
+    inputs:
+      tasks_json:
+        description: 'JSON array of tasks to execute in batch'
+        required: true
+        default: '["List all markdown files", "Count lines of code"]'
+
+jobs:
+  setup:
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.set-matrix.outputs.matrix }}
+    steps:
+      - name: Set task matrix
+        id: set-matrix
+        run: |
+          echo "matrix=${{ inputs.tasks_json }}" >> $GITHUB_OUTPUT
+
+  run-agents:
+    needs: setup
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    strategy:
+      matrix:
+        task: ${{ fromJson(needs.setup.outputs.matrix) }}
+      max-parallel: 3
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run agent
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          echo "🔄 Executing task: ${{ matrix.task }}"
+          node scripts/agent-runner.js "${{ matrix.task }}"
+          echo "✅ Task completed"
+
+      - name: Upload results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: agent-results-${{ strategy.job-index }}
+          path: |
+            **/*.log
+            results/
+          retention-days: 7
+
+  summary:
+    needs: run-agents
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Create summary
+        run: |
+          echo "## 🔄 Batch Agent Execution Complete" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Tasks Executed" >> $GITHUB_STEP_SUMMARY
+          echo '${{ inputs.tasks_json }}' | jq -r '.[] | "- " + .' >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Result" >> $GITHUB_STEP_SUMMARY
+          echo "- **Status**: ${{ needs.run-agents.result }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Run ID**: ${{ github.run_id }}" >> $GITHUB_STEP_SUMMARY
