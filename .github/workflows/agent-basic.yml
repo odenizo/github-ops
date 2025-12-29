@@ -1,0 +1,66 @@
+name: Coding Agent - Basic
+
+on:
+  workflow_dispatch:
+    inputs:
+      task:
+        description: 'Task description for the agent'
+        required: true
+        default: 'List all files in the repository'
+      model:
+        description: 'AI model to use'
+        required: false
+        default: 'claude-3-5-sonnet-20241022'
+        type: choice
+        options:
+          - claude-3-5-sonnet-20241022
+          - claude-3-opus-20250101
+          - claude-3-haiku-20250101
+
+jobs:
+  run-agent:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run agent
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          node scripts/agent-runner.js "${{ inputs.task }}"
+
+      - name: Upload results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: agent-results
+          path: |
+            **/*.log
+            results/
+            agent-output/
+          retention-days: 7
+
+      - name: Job summary
+        if: always()
+        run: |
+          echo "## ✅ Agent Execution Complete" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "- **Task**: ${{ inputs.task }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Model**: ${{ inputs.model }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Status**: ${{ job.status }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Run ID**: ${{ github.run_id }}" >> $GITHUB_STEP_SUMMARY
