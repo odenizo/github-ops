@@ -1,0 +1,47 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Repo Sync Config",
+  "type": "object",
+  "required": ["version", "runs"],
+  "properties": {
+    "version": {"type": "string"},
+    "runs": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["name", "source", "items"],
+        "properties": {
+          "name": {"type": "string"},
+          "source": {
+            "type": "object",
+            "required": ["repo"],
+            "properties": {
+              "repo": {"type": "string", "description": "owner/repo"},
+              "ref": {"type": "string", "description": "branch, tag, or commit", "default": "main"}
+            }
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": ["include", "dest", "mode"],
+              "properties": {
+                "include": {"type": "array", "items": {"type": "string"}},
+                "exclude": {"type": "array", "items": {"type": "string"}, "default": []},
+                "dest": {"type": "string", "description": "destination path in target repo"},
+                "strip_prefix": {"type": "string", "default": ""},
+                "mode": {"type": "string", "enum": ["mirror", "update"], "description": "mirror replaces, update overwrites matching paths"}
+              }
+            }
+          },
+          "post": {
+            "type": "object",
+            "properties": {
+              "commands": {"type": "array", "items": {"type": "string"}, "default": []}
+            }
+          }
+        }
+      }
+    }
+  }
+}

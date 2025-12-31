@@ -1,0 +1,32 @@
+name: Global Instructions Sync
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "0 6 * * *"
+
+jobs:
+  sync-macbook:
+    runs-on: [self-hosted, macbook]
+    steps:
+      - uses: actions/checkout@v4
+      - name: Sync global instructions (macbook)
+        run: |
+          python3 scripts/sync_global_instructions.py \
+            --source docs/global-instructions.md \
+            --targets \
+            "/Users/odenizo-macbook/.codex/AGENTS.md" \
+            "/Users/odenizo-macbook/.claude/CLAUDE.md" \
+            "/Users/odenizo-macbook/.gemini/GEMINI.md"
+  sync-hetzner:
+    runs-on: [self-hosted, hetzner]
+    steps:
+      - uses: actions/checkout@v4
+      - name: Sync global instructions (hetzner)
+        run: |
+          python3 scripts/sync_global_instructions.py \
+            --source docs/global-instructions.md \
+            --targets \
+            "/home/odenizo/.codex/AGENTS.md" \
+            "/home/odenizo/.claude/CLAUDE.md" \
+            "/home/odenizo/.gemini/GEMINI.md"

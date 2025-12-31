@@ -1,0 +1,35 @@
+{
+  "$schema": "./repo-sync-config.schema.json",
+  "version": "1.0.0",
+  "runs": [
+    {
+      "name": "modelcontextprotocol-schema-sync",
+      "source": {
+        "repo": "modelcontextprotocol/modelcontextprotocol",
+        "ref": "main"
+      },
+      "items": [
+        {
+          "include": ["schema/2025-06-18/schema.json"],
+          "exclude": [],
+          "dest": "docs/upstream/modelcontextprotocol/schema/",
+          "strip_prefix": "",
+          "mode": "mirror"
+        },
+        {
+          "include": ["docs/legacy/concepts/tools.mdx", "docs/legacy/concepts/resources.mdx"],
+          "exclude": [],
+          "dest": "docs/upstream/modelcontextprotocol/concepts/",
+          "strip_prefix": "docs/legacy/concepts/",
+          "mode": "update"
+        }
+      ],
+      "post": {
+        "commands": [
+          "npm run lint --if-present",
+          "npm run fmt --if-present"
+        ]
+      }
+    }
+  ]
+}

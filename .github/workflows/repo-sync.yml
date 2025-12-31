@@ -1,0 +1,50 @@
+name: Repo Sync
+
+on:
+  workflow_dispatch:
+  repository_dispatch:
+    types: [repo-sync]
+  schedule:
+    - cron: '0 6 * * *'
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout target repo
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Check upstream heads
+        id: heads
+        run: |
+          npm install
+          node scripts/check_heads.js .github/configs/repo-sync-config.json > /tmp/heads.json
+          echo "heads=$(cat /tmp/heads.json)" >> $GITHUB_OUTPUT
+          CHANGED=$(node -e "console.log(JSON.parse(require('fs').readFileSync('/tmp/heads.json')).changed ? 'true' : 'false')")
+          echo "changed=${CHANGED}" >> $GITHUB_OUTPUT
+
+      - name: Skip if no upstream changes
+        if: steps.heads.outputs.changed == 'false'
+        run: echo "No upstream changes; skipping sync"
+
+      - name: Run sync script
+        if: steps.heads.outputs.changed == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GH_TOKEN }}
+        run: |
+          node scripts/sync_from_sources.js .github/configs/repo-sync-config.json
+
+      - name: Create PR if changes
+        if: steps.heads.outputs.changed == 'true'
+        uses: peter-evans/create-pull-request@v6
+        with:
+          token: ${{ secrets.GH_TOKEN }}
+          commit-message: "chore: sync upstream docs"
+          title: "chore: sync upstream docs"
+          body: "Automated sync"
+          branch: "repo-sync/auto"

@@ -1,0 +1,38 @@
+name: Auto Commit & Push
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '0 * * * *'
+
+jobs:
+  auto-commit-push:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Auto commit and push
+        id: autocommit
+        uses: stefanzweifel/git-auto-commit-action@v5
+        with:
+          commit_message: "chore: auto-sync"
+          push_options: "--force-with-lease"
+          branch: ${{ github.ref_name }}
+
+      - name: Open issue if push failed (possible conflicts)
+        if: failure()
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GH_TOKEN || secrets.GITHUB_TOKEN }}
+          script: |
+            const title = `Auto-sync failed on ${process.env.GITHUB_REF_NAME}`;
+            const body = `Auto-commit/push failed (likely conflicts). Please resolve and rerun.\nRun: ${process.env.GITHUB_RUN_ID}`;
+            await github.rest.issues.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              title,
+              body
+            });
